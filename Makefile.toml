@@ -1,8 +1,11 @@
+[config]
+default_to_workspace = false
+
 [env]
 HOST = "0.0.0.0"
-PORT = 18080
+PORT = 8080
 DATABASE_USERNAME = "app"
-DATABASE_PASSWORD = "password"
+DATABASE_PASSWORD = "passwd"
 DATABASE_NAME = "app"
 DATABASE_PORT_OUTER = 5432
 DATABASE_PORT_INNER = 5432
@@ -10,6 +13,7 @@ REDIS_PORT_OUTER = 6379
 REDIS_PORT_INNER = 6379
 AUTH_TOKEN_TTL = 86400
 
+# Docker Composeのネットワーク内でのDB等への接続情報
 [tasks.set-env-docker.env]
 DATABASE_HOST = "postgres"
 DATABASE_PORT = "${DATABASE_PORT_INNER}"
@@ -19,6 +23,7 @@ REDIS_PORT = "${REDIS_PORT_INNER}"
 JAEGER_HOST = "jaeger"
 JAEGER_PORT = 6831
 
+# Docker Compose外からDB等にアクセスする際の接続情報
 [tasks.set-env-local.env]
 DATABASE_HOST = "localhost"
 DATABASE_PORT = "${DATABASE_PORT_OUTER}"
@@ -28,16 +33,17 @@ REDIS_PORT = "${REDIS_PORT_OUTER}"
 JAEGER_HOST = "localhost"
 JAEGER_PORT = 6831
 
+
 [tasks.before-build]
 run_task = [
-  { name = [
-      "compose-up-db",
-      "compose-up-redis",
-  ] }
+    { name = [
+        "compose-up-db",
+        "compose-up-redis",
+    ] },
 ]
 
 [tasks.compose-build-app]
-extend = "set-env-docker"
+extend = "set-env-local"
 command = "docker"
 args = [
   "compose", "build", "app",
@@ -46,7 +52,7 @@ args = [
 
 [tasks.run]
 extend = "set-env-local"
-dependencies = ["before-build", "compose-build-app"]
+dependencies = ["before-build"]
 command = "cargo"
 args = ["run", "${@}"]
 
@@ -63,7 +69,7 @@ command = "docker"
 args = ["compose", "logs", "${@}"]
 
 [tasks.build]
-extesnd = "set-env-local"
+extend = "set-env-local"
 dependencies = ["before-build"]
 command = "cargo"
 args = ["build", "${@}"]
@@ -72,12 +78,15 @@ args = ["build", "${@}"]
 extend = "set-env-local"
 dependencies = ["before-build"]
 command = "cargo"
-args = ["check", "${@}"]
+args = ["check"]
+
+
+### Development
 
 [tasks.watch]
 extend = "set-env-local"
 dependencies = ["before-build"]
-run_task = [{name = ["fmt", "clippy", "test"]}]
+run_task = [{ name = ["fmt", "clippy", "test"] }]
 watch = true
 
 [tasks.fmt]
@@ -110,6 +119,7 @@ args = ["clippy", "--", "--no-deps", "-Dwarnings"]
 [tasks.test-ci]
 dependencies = ["before-build"]
 run_task = "test"
+
 
 ### Migration
 
@@ -150,6 +160,7 @@ args = [
   "-f", "/work/data/initial_setup.sql"
 ]
 
+
 ### Docker Compose
 
 [tasks.compose]
@@ -176,6 +187,3 @@ args = ["compose", "down"]
 extend = "set-env-docker"
 command = "docker"
 args = ["compose", "down", "-v"]
-
-[config]
-default_to_workspace = false
